@@ -2121,6 +2121,17 @@
       }
       return rows;
     }
+    function matchInitialProduct(modelName, list) {
+      const m = String(modelName || "").toLowerCase();
+      if (m.includes("q27g4f") || m.includes("aoc")) return list.find((p) => p.id === "aoc-q27g4f") || null;
+      if (m.includes("odyssey") || m.includes("ls27cg552") || m.includes("g5")) return list.find((p) => p.id === "samsung-g5") || null;
+      if (m.includes("16 pro max")) return list.find((p) => p.id === "iphone-16pm") || null;
+      if (m.includes("iphone 17") && !m.includes("pro")) return list.find((p) => p.id === "iphone-17") || null;
+      if (m.includes("5500x3d")) return list.find((p) => p.id === "ryzen-5500x3d") || null;
+      if (m.includes("5700x") && !m.includes("x3d")) return list.find((p) => p.id === "ryzen-5700x") || null;
+      if (m.includes("5600")) return list.find((p) => p.id === "ryzen-5600") || null;
+      return list.find((p) => p.modelo.toLowerCase() === m) || null;
+    }
 
     function applyParsedSheetRows(rows, originLabel) {
       if (!rows || rows.length < 2) throw new Error("CSV sem linhas de dados.");
@@ -2149,29 +2160,47 @@
         const menorHistorico = parseMoney(cols[iHist]);
         if (!cat || !mod || !Number.isFinite(precoAtual) || !Number.isFinite(menorHistorico)) continue;
 
-        const existing = INITIAL_PRODUCTS.find((ip) => mod.toLowerCase().includes(ip.modelo.toLowerCase().split(" ")[1] || ""));
+        const existing = matchInitialProduct(mod, INITIAL_PRODUCTS);
         const linkA = (cols[iLinkAtual] || "").startsWith("http")
           ? cols[iLinkAtual]
           : `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`;
         const linkH = (cols[iLinkHist] || "").startsWith("http")
           ? cols[iLinkHist]
           : `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`;
+        const lojaLive = cols[iLoja] || "Loja verificada";
+        const specLive = cols[iSpec] || "Novo lacrado";
+
+        let syncedVariantes;
+        if (existing && Array.isArray(existing.variantes) && existing.variantes.length > 0) {
+          syncedVariantes = JSON.parse(JSON.stringify(existing.variantes));
+          syncedVariantes[0] = {
+            ...syncedVariantes[0],
+            preco: precoAtual,
+            loja: lojaLive,
+            link: linkA,
+            detalhe: `${specLive} · ${lojaLive}`
+          };
+        } else {
+          syncedVariantes = [{ label: "Oferta atual", detalhe: `${specLive} · ${lojaLive}`, preco: precoAtual, loja: lojaLive, link: linkA }];
+        }
+
+        const uniqueId = existing && !parsed.some((x) => x.id === existing.id) ? existing.id : `sheet-row-${r}`;
 
         parsed.push({
-          id: existing ? existing.id : `sheet-row-${r}`,
+          id: uniqueId,
           categoria: cat,
           modelo: mod,
-          subtitulo: cols[iSpec] || "Novo lacrado",
+          subtitulo: specLive,
           precoAtual,
-          lojaAtual: cols[iLoja] || "Loja verificada",
-          condicao: cols[iSpec] || "Novo lacrado",
+          lojaAtual: lojaLive,
+          condicao: specLive,
           linkAtual: linkA,
           menorHistorico,
           fonteHistorico: cols[iFonteHist] || "Planilha",
           linkHistorico: linkH,
           atualizadoEm: cols[iData] || "Atualizado",
           activeVariantIdx: 0,
-          variantes: existing ? existing.variantes : [{ label: "Padrão", detalhe: cols[iSpec] || "Novo lacrado", preco: precoAtual, loja: cols[iLoja] || "Loja", link: linkA }],
+          variantes: syncedVariantes,
           history: existing ? JSON.parse(JSON.stringify(existing.history)) : [{ label: cols[iData] || "Agora", price: precoAtual }]
         });
       }
@@ -2198,7 +2227,7 @@
         const price = parseMoney(cols[iPreco]);
         const label = (cols[iData] || "").trim().slice(0, 11);
         if (!mod || !Number.isFinite(price)) continue;
-        const match = state.products.find((p) => mod.includes(p.modelo.toLowerCase().split(" ")[1] || p.modelo.toLowerCase()));
+        const match = matchInitialProduct(mod, state.products);
         if (!match) continue;
         if (!grouped[match.id]) grouped[match.id] = [];
         grouped[match.id].push({ label: label || `#${r}`, price });
@@ -2208,6 +2237,7 @@
         if (p && grouped[pid].length > 0) p.history = grouped[pid];
       });
     }
+
 
     function applyParsedAlternativesRows(rows) {
       if (!rows || rows.length < 2) return;
