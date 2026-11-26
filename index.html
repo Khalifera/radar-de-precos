@@ -2170,20 +2170,14 @@
         const lojaLive = cols[iLoja] || "Loja verificada";
         const specLive = cols[iSpec] || "Novo lacrado";
 
-        let syncedVariantes;
-        if (existing && Array.isArray(existing.variantes) && existing.variantes.length > 0) {
-          syncedVariantes = JSON.parse(JSON.stringify(existing.variantes));
-          syncedVariantes[0] = {
-            ...syncedVariantes[0],
-            preco: precoAtual,
-            loja: lojaLive,
-            link: linkA,
-            detalhe: `${specLive} · ${lojaLive}`
-          };
-        } else {
-          syncedVariantes = [{ label: "Oferta atual", detalhe: `${specLive} · ${lojaLive}`, preco: precoAtual, loja: lojaLive, link: linkA }];
-        }
-
+const shortStoreLabel = lojaLive.split("(")[0].trim() || "Oferta atual";
+        const syncedVariantes = [{
+          label: shortStoreLabel,
+          detalhe: `${specLive} · ${lojaLive}`,
+          preco: precoAtual,
+          loja: lojaLive,
+          link: linkA
+            }];
         const uniqueId = existing && !parsed.some((x) => x.id === existing.id) ? existing.id : `sheet-row-${r}`;
 
         parsed.push({
@@ -2251,7 +2245,7 @@
       const iDif = idx(["diferencial", "especifica", "motivo"], 2);
       const iPreco = idx(["preço", "valor"], 3);
       const iLoja = idx(["loja"], 4);
-      const iLink = idx(["link", "url"], 5);
+      const iLink = idx(["link", "url"], 6);
 
       const parsed = [];
       for (let r = 1; r < rows.length; r++) {
@@ -2273,7 +2267,8 @@
     }
 
     async function fetchCsvText(url) {
-      const res = await fetch(url);
+      const bustUrl = `${url}${url.includes("?") ? "&" : "?"}_ts=${Date.now()}`;
+      const res = await fetch(bustUrl, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
